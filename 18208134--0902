@@ -1,0 +1,68 @@
+from lxml import etree
+import re
+import requests
+from selenium.common.exceptions import TimeoutException
+from bs4 import BeautifulSoup
+import snownlp
+
+class Jd:
+    def page_get(self, page, keyword):
+        list=[]
+        print('正在爬取第', page, '页')
+        try:
+            url = 'https://search.jd.com/Search?keyword=%s&enc=utf-8&page=%s' % (keyword, page)
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:65.0) Gecko/20100101 Firefox/65.0',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.8,zh-CN;q=0.5,zh;q=0.3',
+                'Referer': 'https://www.jd.com/',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'TE': 'Trailers',
+            }
+            browser = requests.get(url, headers=headers)
+            html_str = browser.text
+            # print(html_str)
+            html = etree.HTML(html_str)
+            data = {}
+            name = keyword
+            shop_name = html.xpath("//div[@class='p-img']/a/@title")
+            price = html.xpath("//div/ul/li/div/div/strong/i/text()")
+            location = html.xpath("//div[@class='p-img']/a/img/@src")
+            data['name'] = name
+            data['price'] = price
+            data['shop_name'] = shop_name
+            data['location'] = location
+
+            soup = BeautifulSoup(html_str, "html.parser")
+            # print(soup)
+            texts = soup.select("li[class='gl-item'] a[target='_blank']")
+            for li in texts:
+                url=li['href']
+                if(url[-1]=='l'):
+                    num = re.findall(r"\d+",url)
+                    list.append(num)
+            list=quchong(list)
+            print(len(list))
+            return list
+            # print(data)
+            # self.result_save(data)
+
+        except TimeoutException:
+            self.page_get(page, keyword)
+
+def quchong(liebiao):
+        for x in liebiao:
+            while liebiao.count(x) > 1:
+                del liebiao[liebiao.index(x)]
+        return liebiao
+
+
+jd = Jd()
+# pages = int(input('请输入要爬取的页数：'))
+# keyword = input('请输入要搜索的关键字：')
+# for i in range(1, pages + 1):
+list=jd.page_get(2, 'iphone11')
+print(list)
+
