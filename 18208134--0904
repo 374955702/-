@@ -1,0 +1,75 @@
+def judge(list):
+    newlist=[]
+    for id in list:
+        url="https://item.jd.com/"+str(id[0])+".html#none"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:65.0) Gecko/20100101 Firefox/65.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.8,zh-CN;q=0.5,zh;q=0.3',
+            'Referer': 'https://www.jd.com/',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'TE': 'Trailers',
+        }
+        r = requests.get(url, headers=headers)
+        r.raise_for_status()
+        r.encoding = r.apparent_encoding
+        demo = r.text
+        soup = BeautifulSoup(demo, "html.parser")
+        try:
+            texts = soup.select("div[class='Ptable-item'] dl[class='clearfix']")[1].text
+            if (texts[1:5] != '产品名称'):
+                texts = soup.select("div[class='Ptable-item'] dl[class='clearfix']")[2].text
+                print("")
+            else:
+                print("")
+            titile2 = ['iPhone 11', 'Apple iPhone 11', 'IPHONE 11', 'iphone11', '苹果 iPhone 11']
+            # print(texts[5:],"********",texts[5:] in titile2,len(texts[5:].strip()))
+            if (texts[5:].strip() in titile2):
+                print(texts[5:],id[0])
+                newlist.append(id[0])
+            else:
+                print("")
+        except:
+            texts = soup.select("ul[class='parameter2 p-parameter-list'] li")[0].text
+            if((texts[5:].strip()=='AppleiPhone 11') or (texts[5:].strip()=='AppleiPhone11') or[texts[5:].strip()=='商品名称：Apple 苹果  iPhone 11 手机 全网通 双卡双待 黑色 128GB']):
+                print(texts[5:],id[0])
+                newlist.append(id[0])
+            else:
+                print('非iphone11',url)
+    return newlist
+
+
+
+import pandas as pd
+from wordcloud import WordCloud
+import jieba
+import matplotlib.pyplot as plt
+
+def creategoodWordcloud(path):
+    f1 = pd.read_csv("D:\大数据比赛数据\\good.csv",encoding='gbk')
+    f=f1['评论内容']
+    f=str(f)
+    # f = open(path, 'r', encoding='gbk').read()
+    # print(f)
+    cut_text = ''.join(jieba.cut(f))
+    wc = WordCloud(font_path='C://Windows//Fonts//msyh.ttc',background_color="white", width=3000, height=2500).generate(cut_text)
+    plt.imshow(wc, interpolation='bilinear')
+    plt.axis("off")
+    plt.show()
+    wc.to_file('D:\大数据比赛数据\\1.jpg')
+
+def createbadWordcloud(path):
+    f1 = pd.read_csv("D:\大数据比赛数据\\bad.csv", encoding='gbk')
+    f = f1['评论内容']
+    f = str(f)
+    cut_text = ''.join(jieba.cut(f))
+    wc = WordCloud(font_path='C://Windows//Fonts//msyh.ttc',background_color="white", width=3000, height=2500).generate(cut_text)
+    plt.imshow(wc, interpolation='bilinear')
+    plt.axis("off")
+    plt.show()
+    wc.to_file('D:\大数据比赛数据\\2.jpg')
+
+creategoodWordcloud('D:\大数据比赛数据\\good.csv')
+createbadWordcloud('D:\大数据比赛数据\\bad.csv')
