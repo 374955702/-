@@ -1,0 +1,193 @@
+import sklearn
+from nltk.classify.scikitlearn import  SklearnClassifier
+from sklearn.svm import SVC, LinearSVC,  NuSVC
+from sklearn.naive_bayes import  MultinomialNB, BernoulliNB
+from sklearn.linear_model import  LogisticRegression
+from sklearn.metrics import  accuracy_score
+import nltk
+import jieba
+from nltk.collocations import  BigramCollocationFinder
+from nltk.metrics import  BigramAssocMeasures
+from nltk.probability import FreqDist, ConditionalFreqDist
+from random import shuffle
+import warnings
+warnings.filterwarnings('ignore')
+import pandas as pd
+import re
+
+def find_word(content):
+    pattern = re.compile(r'[^\u4e00-\u9fa5]')
+    return re.sub(pattern, '', content)
+def data_check(data):
+    print('数据大小:', data.shape)
+    # 去空
+    data.dropna(subset=['评论内容'],inplace=True)
+    # 去重
+    data.drop_duplicates(subset=['评论内容'], keep='last',inplace=True)
+    return data
+def handel(data):
+    print('处理数据')
+    # 去除无评论用户
+    data=data[~data['评论内容'].str.contains('此用户')]
+    data = data[~data['评论内容'].str.contains('买家没有填写评价内容')]
+    # 去除评论信息小于4个字符的无意义评论
+    data=data[data['评论内容'].str.len()>=4]
+    # 机械压缩评论
+    data['评论内容'] = data['评论内容'].apply(lambda x: find_word(x))
+    print(len(data))
+    return data
+def clean(filepath):
+    # filepath = 'D:\大数据比赛数据\整合数据\\train差评\\差评train2.csv'
+    try:
+        f = open(filepath, 'r', errors='ignore', encoding='gbk')
+        data = pd.read_csv(f, error_bad_lines=False)
+        c_data = data_check(data)
+    except:
+        f = open(filepath, 'r', errors='ignore', encoding='utf-8')
+        data = pd.read_csv(f, error_bad_lines=False)
+        c_data = data_check(data)
+    c_data=handel(c_data)
+    return c_data
+
+
+def read_file(filename):
+     stop = [line.strip() for line in  open('D:\大数据比赛数据\\stop.txt','r',encoding='utf-8').readlines()]  #停用词
+     f = open(filename,'r',encoding='utf-8',errors="ignore")
+     line = f.readline()
+     str = []
+     while line:
+         s = line.split('\t')
+         fenci = jieba.cut(s[0],cut_all=False)  #False默认值：精准模式
+         str.append(list(set(fenci)-set(stop)))
+         line = f.readline()
+     return str
+
+
+#提取出特征词语
+def jieba_feature(number):
+    posWords = []
+    negWords = []
+    for items in read_file('D:\大数据比赛数据\整合数据\\train好评\\jgood2.csv'):  # 把集合的集合变成集合
+        for item in items:
+            posWords.append(item)
+    for items in read_file('D:\大数据比赛数据\整合数据\\train差评\\jbad2.csv'):
+        for item in items:
+            negWords.append(item)
+
+    word_fd = FreqDist()  # 可统计所有词的词频
+    print(word_fd)
+    cond_word_fd = ConditionalFreqDist()  # 可统计积极文本中的词频和消极文本中的词频
+    print(cond_word_fd)
+
+    for word in posWords:
+        word_fd[word] += 1
+        cond_word_fd['1'][word] += 1
+
+    for word in negWords:
+        word_fd[word] += 1
+        cond_word_fd['2'][word] += 1
+
+    pos_word_count = cond_word_fd['1'].N()  # 积极词的数量
+    neg_word_count = cond_word_fd['2'].N()  # 消极词的数量
+    total_word_count = pos_word_count + neg_word_count
+
+    word_scores = {}  # 包括了每个词和这个词的信息量
+
+    for word, freq in word_fd.items():
+        pos_score = BigramAssocMeasures.chi_sq(cond_word_fd['pos'][word], (freq, pos_word_count),
+                                               total_word_count)  # 计算积极词的卡方统计量，这里也可以计算互信息等其它统计量
+        neg_score = BigramAssocMeasures.chi_sq(cond_word_fd['neg'][word], (freq, neg_word_count), total_word_count)
+        word_scores[word] = pos_score + neg_score  # 一个词的信息量等于积极卡方统计量加上消极卡方统计量
+
+    best_vals = sorted(word_scores.items(), key=lambda item: item[1], reverse=True)[
+                :number]  # 把词按信息量倒序排序。number是特征的维度，是可以不断调整直至最优的
+    best_words = set([w for w, s in best_vals])
+    # print(best_words)
+    return dict([(word, True) for word in best_words])
+
+
+def build_features():
+    feature = jieba_feature(3000)  # 第四种：结巴分词
+    posFeatures = []
+    for items in read_file('D:\大数据比赛数据\整合数据\\train好评\\jgood2.csv'):
+        a = {}
+        for item in items:
+            if item in feature.keys():
+                a[item] = 'True'
+        posWords = [a, '1']  # 为积极文本赋予"1"
+        posFeatures.append(posWords)
+    negFeatures = []
+    for items in read_file('D:\大数据比赛数据\整合数据\\train差评\\jbad2.csv'):
+        a = {}
+        for item in items:
+            if item in feature.keys():
+                a[item] = 'True'
+        negWords = [a, '2']  # 为消极文本赋予"2"
+        negFeatures.append(negWords)
+    trainFeatures = []
+    jishu=0
+    df=pd.read_csv("D:\大数据比赛数据\整合数据\mate30\\mate302.csv")
+    # df=clean("D:\大数据比赛数据\整合数据\iphone11\\c_type1.csv")
+    df2=df['评论内容']
+    df2.to_csv("D:\大数据比赛数据\整合数据\mate30\\mate302测试.csv",index=0)
+    for items in read_file('D:\大数据比赛数据\整合数据\mate30\\mate302测试.csv'):
+        # print(items)
+        if(jishu>0):
+            a = {}
+            for item in items:
+                if item in feature.keys():
+                    a[item] = 'True'
+            trainWords = [a,'unknow']
+            trainFeatures.append(trainWords)
+        jishu=1
+    return posFeatures, negFeatures,trainFeatures
+
+posFeatures,negFeatures,trainFeatures =  build_features()
+# print(len(posFeatures))
+# print(len(negFeatures))
+# print(len(trainFeatures))
+
+# shuffle(posFeatures)
+# shuffle(negFeatures) #把文本的排列随机化
+# shuffle(trainFeatures)
+
+train =  posFeatures[0:]+negFeatures[0:]#训练集(70%)
+test = posFeatures[0:]+negFeatures[0:]#验证集(30%)
+newtest=trainFeatures
+data,tag = zip(*test)#分离测试集合的数据和标签，便于验证和测试
+data2,tag2 = zip(*newtest)#分离测试集合的数据和标签，便于验证和测试
+
+
+def score(classifier):
+    classifier = SklearnClassifier(classifier)
+    classifier.train(train)  # 训练分类器
+    pred2=classifier.classify_many(data2)
+    print(pred2)
+    print(len(pred2))
+    df=pd.read_csv("D:\大数据比赛数据\整合数据\mate30\\mate302.csv")
+    # df=clean("D:\大数据比赛数据\整合数据\iphone11\\c_type1.csv")
+    df['label']=pred2
+    # list=['留言人','颜色','内存','时间','评论内容','label']
+    # df=df[list]
+    df.to_csv("D:\大数据比赛数据\整合数据\mate30\\mate30c_type4.csv",index=0)
+    pred = classifier.classify_many(data)  # 给出预测的标签
+    n = 0
+    s = len(pred)
+    for i in range(0, s):
+        if pred[i] == tag[i]:
+            n = n + 1
+    return n / s  # 分类器准确度
+
+
+# print('BernoulliNB`s accuracy is %f'  %score(BernoulliNB()))
+# print('MultinomiaNB`s accuracy is %f'  %score(MultinomialNB()))
+print('LogisticRegression`s accuracy is  %f' %score(LogisticRegression()))
+# print('SVC`s accuracy is %f'  %score(SVC()))
+# print('LinearSVC`s accuracy is %f'  %score(LinearSVC()))
+# print('NuSVC`s accuracy is %f'  %score(NuSVC()))
+
+
+# LogisticRegression(C=1.0, class_weight=None, dual=False, fit_intercept=True,
+#           intercept_scaling=1, max_iter=100, multi_class='ovr', n_jobs=1,
+#           penalty='l2', random_state=None, solver='liblinear', tol=0.0001,
+#           verbose=0, warm_start=False)
