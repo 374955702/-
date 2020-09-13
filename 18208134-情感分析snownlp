@@ -1,0 +1,87 @@
+#基于情感字典
+from pyecharts.charts import Bar
+from pyecharts.charts import Line
+#加载情感分析模块
+from snownlp import SnowNLP
+#from snownlp import sentiment
+import matplotlib.pyplot as plt
+import pandas as pd
+from wordcloud import WordCloud
+import jieba
+import pyecharts.options as opts
+#导入样例数据
+def qingganfenxi(aa,bb):
+    df=pd.read_csv(aa,encoding="utf-8",nrows=1000)
+    df=df.reset_index(drop=True)
+    #提取所有数据
+    df1=df.iloc[:,1]
+    print('将提取的数据打印出来：\n',df1)
+    #遍历每条评论进行预测
+    values=[SnowNLP(i).sentiments for i in df1]
+    print(values)
+    #输出积极的概率，大于0.5积极的，小于0.5消极的
+    #myval保存预测值
+    myval=[]
+    good=0
+    bad=0
+    for i in values:
+       if (i>=0.5):
+           myval.append("正面")
+           good=good+1
+       else:
+           myval.append("负面")
+           bad=bad+1
+    df['预测值']=values
+    df['评价类别'] = myval
+    df.to_csv(bb, index=0)
+    rate=good/(good+bad)
+    print('好评率','%.f%%' % (rate * 100)) #格式化为百分比
+
+qingganfenxi('D:\大数据比赛数据\整合数据\小米\\小米1022.csv','D:\大数据比赛数据\整合数据\小米\\词典.csv')
+
+
+#导入柱状图-Bar
+
+#设置行名
+# columns = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+#设置数据
+# data1 = [2.0, 4.9, 7.0, 23.2, 25.6, 76.7, 135.6, 162.2, 32.6, 20.0, 6.4, 3.3]
+# data2 = [2.6, 5.9, 9.0, 26.4, 28.7, 70.7, 175.6, 182.2, 48.7, 18.8, 6.0, 2.3]
+#设置柱状图的主标题与副标题
+# lines = (
+#     Line(init_opts=opts.InitOpts(width='720px',height='320px'))
+#     .add_xaxis(xaxis_data=list)
+#     .add_yaxis(series_name='',y_axis=values,label_opts=opts.LabelOpts(is_show=False))
+#     .set_series_opts(
+#         markpoint_opts=opts.MarkPointOpts(
+#             data=[
+#                 opts.MarkPointItem(type_="average", name="平均值"),
+#                 ]
+#         )
+#     )
+# )
+# lines.render("D:\\测试\\3.html")
+# print("作图完成")
+# # #作图
+# # y=values
+# # plt.rc('font', family='SimHei', size=10)
+# # plt.plot(y, marker='o', mec='r', mfc='w',label=u'评价分值')
+# # plt.xlabel('用户')
+# # plt.ylabel('评价分值')
+# # # 让图例生效
+# # plt.legend()
+# # #添加标题
+# # plt.title('京东评论情感分析',family='SimHei',size=14,color='blue')
+# # plt.show()
+#
+# #词云
+# def createWordcloud(path):
+#     f = open(path, 'r', encoding='utf-8').read()
+#     cut_text = ''.join(jieba.cut(f))
+#     wc = WordCloud(font_path='C://Windows//Fonts//msyh.ttc',background_color="white", width=3000, height=2500).generate(cut_text)
+#     plt.imshow(wc, interpolation='bilinear')
+#     plt.axis("off")
+#     plt.show()
+#     wc.to_file('D:\大数据比赛数据\\1.jpg')
+#
+# createWordcloud(aa)
